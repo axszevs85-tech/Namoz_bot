@@ -3,9 +3,10 @@
 Namoz vaqtlari va Qur'on suralari - Telegram bot
 ==================================================
 """
-
+import os
 import logging
 import requests
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
