@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+Namoz vaqtlari va Qur'on suralari - Telegram bot
+==================================================
+"""
+
 import logging
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,6 +16,8 @@ from telegram.ext import (
     ConversationHandler,
     filters,
 )
+
+# ------------------------- SOZLAMALAR -------------------------
 
 BOT_TOKEN = "8641272823:AAFpTcL-I3zm8Q5Xc6-Dq9AWLp6TGaQPrrU"
 UZ_EDITION = "uz.sodik"
@@ -61,7 +68,11 @@ async def namoz_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         resp = requests.get(
             "http://api.aladhan.com/v1/timingsByCity",
-            params={"city": shahar, "country": "Uzbekistan", "method": 2},
+            params={
+                "city": shahar,
+                "country": "Uzbekistan",
+                "method": 2,
+            },
             timeout=10,
         )
         data = resp.json()
@@ -89,7 +100,9 @@ async def namoz_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Namoz vaqtlarini olishda xatolik: {e}")
-        await update.message.reply_text("❌ Xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring.")
+        await update.message.reply_text(
+            "❌ Xatolik yuz berdi. Birozdan so'ng qayta urinib ko'ring."
+        )
 
     return ConversationHandler.END
 
@@ -125,7 +138,9 @@ async def sura_tanlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = resp.json()
 
         if data.get("code") != 200:
-            await query.edit_message_text("❌ Sura matnini olishda xatolik. Keyinroq urinib ko'ring.")
+            await query.edit_message_text(
+                "❌ Sura matnini olishda xatolik. Keyinroq urinib ko'ring."
+            )
             return
 
         sura = data["data"]
@@ -136,4 +151,38 @@ async def sura_tanlandi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for oyat in oyatlar:
             qator = f"{oyat['numberInSurah']}. {oyat['text']}\n\n"
             if len(matn) + len(qator) > 3800:
-                await contex
+                await context.bot.send_message(chat_id=query.message.chat_id, text=matn)
+                matn = ""
+            matn += qator
+
+        if matn:
+            await context.bot.send_message(chat_id=query.message.chat_id, text=matn)
+
+    except Exception as e:
+        logger.error(f"Sura matnini olishda xatolik: {e}")
+        await query.edit_message_text("❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
+
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+
+    namoz_conv = ConversationHandler(
+        entry_points=[CommandHandler("namoz", namoz_start)],
+        states={
+            WAITING_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, namoz_city)],
+        },
+        fallbacks=[CommandHandler("cancel", namoz_cancel)],
+    )
+    app.add_handler(namoz_conv)
+
+    app.add_handler(CommandHandler("sura", sura_start))
+    app.add_handler(CallbackQueryHandler(sura_tanlandi, pattern=r"^sura_\d+$"))
+
+    logger.info("Bot ishga tushdi...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
